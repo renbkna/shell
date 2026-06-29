@@ -34,6 +34,20 @@ Item {
     }
     property Title current: text1
 
+    function switchTitle(nextText: string): void {
+        if (current.text === nextText)
+            return;
+
+        const next = current === text1 ? text2 : text1;
+        next.text = nextText;
+        current = next;
+    }
+
+    function syncCurrentTitle(nextText: string): void {
+        if (current.text !== nextText)
+            current.text = nextText;
+    }
+
     clip: true
     implicitWidth: Math.max(icon.implicitWidth, current.implicitHeight)
     implicitHeight: icon.implicitHeight + current.implicitWidth + current.anchors.topMargin
@@ -90,12 +104,8 @@ Item {
         elide: Qt.ElideRight
         elideWidth: root.maxHeight - icon.height
 
-        onTextChanged: {
-            const next = root.current === text1 ? text2 : text1;
-            next.text = elidedText;
-            root.current = next;
-        }
-        onElideWidthChanged: root.current.text = elidedText
+        Component.onCompleted: root.syncCurrentTitle(elidedText)
+        onElidedTextChanged: root.switchTitle(elidedText)
     }
 
     Behavior on implicitHeight {
