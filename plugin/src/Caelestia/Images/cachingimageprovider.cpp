@@ -89,14 +89,21 @@ private:
             }
         }
 
-        // Schedule cache job (this call will return the original image, but later ones will use cache)
-        ImageCacher::instance()->schedule(path, cachePath, size, m_fillMode);
-
-        m_image = QImage(path);
-        if (m_image.isNull()) {
+        QImage source(path);
+        if (source.isNull()) {
             m_error = QStringLiteral("Failed to decode source: ") + path;
             qCWarning(lcCProv).noquote() << m_error;
+            return;
         }
+
+        m_image = ImageCacher::render(source, size, m_fillMode);
+        if (m_image.isNull()) {
+            m_error = QStringLiteral("Failed to scale source: ") + path;
+            qCWarning(lcCProv).noquote() << m_error;
+            return;
+        }
+
+        ImageCacher::instance()->scheduleSave(cachePath, m_image);
     }
 
     QString m_id;

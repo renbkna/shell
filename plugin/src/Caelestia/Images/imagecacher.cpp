@@ -17,10 +17,10 @@ namespace caelestia::images {
 
 namespace {
 
-QString sha256sum(const QString& path) {
+QString sourceContentHash(const QString& path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        qCWarning(lcCacher).noquote() << "sha256sum: failed to open" << path;
+        qCWarning(lcCacher).noquote() << "sourceContentHash: failed to open" << path;
         return {};
     }
 
@@ -55,7 +55,7 @@ const QString& ImageCacher::cacheDir() {
 }
 
 QString ImageCacher::cachePathFor(const QString& sourcePath, const QSize& size, FillMode fillMode) {
-    const QString sha = sha256sum(sourcePath);
+    const QString sha = sourceContentHash(sourcePath);
     if (sha.isEmpty())
         return {};
 
@@ -66,45 +66,9 @@ QString ImageCacher::cachePathFor(const QString& sourcePath, const QSize& size, 
     return cacheDir() + QLatin1Char('/') + filename;
 }
 
-ImageCacher* ImageCacher::instance() {
-    static ImageCacher s_instance;
-    return &s_instance;
-}
-
-ImageCacher::ImageCacher(QObject* parent)
-    : QObject(parent) {}
-
-void ImageCacher::schedule(const QString& sourcePath, const QSize& size, FillMode fillMode) {
-    schedule(sourcePath, cachePathFor(sourcePath, size, fillMode), size, fillMode);
-}
-
-void ImageCacher::schedule(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode) {
-    if (cachePath.isEmpty())
-        return;
-
-    {
-        QMutexLocker locker(&m_mutex);
-        if (m_inflight.contains(cachePath))
-            return;
-        m_inflight.insert(cachePath);
-    }
-
-    QThreadPool::globalInstance()->start([this, sourcePath, cachePath, size, fillMode]() {
-        runJob(sourcePath, cachePath, size, fillMode);
-        QMutexLocker locker(&m_mutex);
-        m_inflight.remove(cachePath);
-    });
-}
-
-void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode) {
-    if (QFile::exists(cachePath)) {
-        return;
-    }
-
-    QImage image(sourcePath);
-    if (image.isNull()) {
-        qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
-        return;
+QImage ImageCacher::render(const QImage& source, const QSize& size, FillMode fillMode) {
+    if (source.isNull() || !size.isValid() || size.isEmpty()) {
+        return {};
     }
 
     Qt::AspectRatioMode scaleMode;
@@ -120,24 +84,55 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
         break;
     }
 
-    image.convertTo(QImage::Format_ARGB32);
+    QImage image = source.convertToFormat(QImage::Format_ARGB32);
     image = image.scaled(size, scaleMode, Qt::SmoothTransformation);
 
     if (image.isNull()) {
-        qCWarning(lcCacher).noquote() << "Failed to scale" << sourcePath;
-        return;
+        return {};
     }
 
-    QImage canvas;
     if (fillMode == FillMode::Stretch) {
-        canvas = image;
-    } else {
-        canvas = QImage(size, QImage::Format_ARGB32);
-        canvas.fill(Qt::transparent);
+        return image;
+    }
 
-        QPainter painter(&canvas);
-        painter.drawImage((size.width() - image.width()) / 2, (size.height() - image.height()) / 2, image);
-        painter.end();
+    QImage canvas(size, QImage::Format_ARGB32);
+    canvas.fill(Qt::transparent);
+
+    QPainter painter(&canvas);
+    painter.drawImage((size.width() - image.width()) / 2, (size.height() - image.height()) / 2, image);
+    painter.end();
+    return canvas;
+}
+
+ImageCacher* ImageCacher::instance() {
+    static ImageCacher s_instance;
+    return &s_instance;
+}
+
+ImageCacher::ImageCacher(QObject* parent)
+    : QObject(parent) {}
+
+void ImageCacher::scheduleSave(const QString& cachePath, const QImage& image) {
+    if (cachePath.isEmpty() || image.isNull())
+        return;
+
+    {
+        QMutexLocker locker(&m_mutex);
+        if (m_inflight.contains(cachePath))
+            return;
+        m_inflight.insert(cachePath);
+    }
+
+    QThreadPool::globalInstance()->start([this, cachePath, image]() {
+        saveImage(cachePath, image);
+        QMutexLocker locker(&m_mutex);
+        m_inflight.remove(cachePath);
+    });
+}
+
+void ImageCacher::saveImage(const QString& cachePath, const QImage& image) {
+    if (QFile::exists(cachePath)) {
+        return;
     }
 
     const QString parent = QFileInfo(cachePath).absolutePath();
@@ -147,7 +142,7 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
     }
 
     QSaveFile saveFile(cachePath);
-    if (!saveFile.open(QIODevice::WriteOnly) || !canvas.save(&saveFile, "PNG") || !saveFile.commit()) {
+    if (!saveFile.open(QIODevice::WriteOnly) || !image.save(&saveFile, "PNG") || !saveFile.commit()) {
         qCWarning(
             lcCacher, "Failed to save to %s: %s", qUtf8Printable(cachePath), qUtf8Printable(saveFile.errorString()));
         return;

@@ -2,6 +2,7 @@
 
 #include <qmutex.h>
 #include <qobject.h>
+#include <qimage.h>
 #include <qset.h>
 #include <qsize.h>
 #include <qstring.h>
@@ -22,14 +23,14 @@ public:
 
     static const QString& cacheDir();
     static QString cachePathFor(const QString& sourcePath, const QSize& size, FillMode fillMode);
+    static QImage render(const QImage& source, const QSize& size, FillMode fillMode);
 
-    void schedule(const QString& sourcePath, const QSize& size, FillMode fillMode);
-    void schedule(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode);
+    void scheduleSave(const QString& cachePath, const QImage& image);
 
 private:
     explicit ImageCacher(QObject* parent = nullptr);
 
-    static void runJob(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode);
+    static void saveImage(const QString& cachePath, const QImage& image);
 
     QMutex m_mutex;
     QSet<QString> m_inflight;
