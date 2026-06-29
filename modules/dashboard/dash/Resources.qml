@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
@@ -37,18 +39,18 @@ Item {
 
         Resource {
             icon: "memory"
-            value: Cpu.percentage
+            rawValue: Cpu.percentage
         }
 
         Resource {
             icon: "memory_alt"
-            value: Memory.percentage
+            rawValue: Memory.percentage
             fgColour: Colours.palette.m3tertiary
         }
 
         Resource {
             icon: "hard_disk"
-            value: Storage.percentage
+            rawValue: Storage.percentage
             fgColour: Colours.palette.m3secondary
         }
     }
@@ -56,12 +58,24 @@ Item {
         id: res
 
         required property string icon
+        required property real rawValue
+        readonly property real targetValue: Math.max(0, Math.min(1, isNaN(rawValue) ? 0 : rawValue))
+        property bool animateNextValueChange
+        property real displayedValue: targetValue
 
         Layout.fillHeight: true
         implicitSize: height
         strokeWidth: Tokens.sizes.dashboard.resourceProgressThickness
+        value: displayedValue
 
-        Behavior on clampedVal {
+        onTargetValueChanged: {
+            animateNextValueChange = Math.abs(targetValue - displayedValue) >= 0.05;
+            displayedValue = targetValue;
+        }
+
+        Behavior on displayedValue {
+            enabled: res.animateNextValueChange
+
             Anim {}
         }
 

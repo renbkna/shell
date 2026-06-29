@@ -21,22 +21,52 @@ Item {
     property alias hasEndIndicator: dot.active
 
     property bool wavy: false
-    property alias waveFrequency: wave.frequency
-    property alias waveAmplitude: wave.amplitudeMultiplier
+    property int waveFrequency: 8
+    property real waveAmplitude: 0.5
     property bool wavePaused
-    property alias waveDuration: waveProgAnim.duration
+    property int waveDuration: 2000
 
     readonly property real size: Math.min(width, height)
-    readonly property real arcRadius: (size - padding - strokeWidth * (1 + waveAmplitude * 2)) / 2
+    readonly property real effectiveWaveAmplitude: wavy ? waveAmplitude : 0
+    readonly property real arcRadius: (size - padding - strokeWidth * (1 + effectiveWaveAmplitude * 2)) / 2
     property real clampedVal: Math.max(1 / 360, Math.min(1, isNaN(value) ? 0 : value)) // Not readonly for animations
     readonly property real gapAngle: ((spacing + strokeWidth) / (arcRadius || 1)) * (180 / Math.PI)
     readonly property real dotAngleRad: (startAngle + sweepAngle - gapAngle * (sweepAngle < 360 ? 0 : 1)) * Math.PI / 180
 
-    readonly property real thickness: strokeWidth * (1 + waveAmplitude) * 2 // For consumers
+    readonly property real thickness: strokeWidth * (1 + effectiveWaveAmplitude) * 2 // For consumers
     property real implicitSize
 
     implicitWidth: implicitSize
     implicitHeight: implicitSize
+
+    Shape {
+        preferredRendererType: Shape.CurveRenderer
+        asynchronous: true
+        visible: !root.wavy
+        opacity: Math.min(1, progressArc.sweepAngle)
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.fgColour
+            strokeWidth: root.strokeWidth
+            capStyle: ShapePath.RoundCap
+
+            PathAngleArc {
+                id: progressArc
+
+                radiusX: root.arcRadius
+                radiusY: root.arcRadius
+                centerX: root.size / 2
+                centerY: root.size / 2
+                startAngle: root.startAngle
+                sweepAngle: Math.max(1 / 360, root.sweepAngle * root.clampedVal)
+            }
+
+            Behavior on strokeColor {
+                CAnim {}
+            }
+        }
+    }
 
     Shape {
         preferredRendererType: Shape.CurveRenderer
@@ -66,41 +96,36 @@ Item {
         }
     }
 
-    WavyLine {
-        id: wave
-
+    Loader {
+        active: root.wavy
         anchors.fill: parent
-        anchors.margins: -lineWidth * amplitudeMultiplier
 
-        lineWidth: root.strokeWidth
-        color: root.fgColour
-        pathType: WavyLine.Arc
-        radius: root.arcRadius
-        startAngle: root.startAngle
-        fullAngle: root.sweepAngle
-        value: root.clampedVal
-        frequency: 8
-        amplitudeMultiplier: root.wavy ? 0.5 : 0
+        sourceComponent: WavyLine {
+            anchors.fill: parent
+            anchors.margins: -lineWidth * amplitudeMultiplier
 
-        Anim on waveProgress {
-            id: waveProgAnim
+            lineWidth: root.strokeWidth
+            color: root.fgColour
+            pathType: WavyLine.Arc
+            radius: root.arcRadius
+            startAngle: root.startAngle
+            fullAngle: root.sweepAngle
+            value: root.clampedVal
+            frequency: root.waveFrequency
+            amplitudeMultiplier: root.waveAmplitude
 
-            running: true
-            paused: root.wavePaused || wave.amplitudeMultiplier === 0
-            from: 0
-            to: 1
-            duration: 2000
-            easing.type: Easing.Linear
-            loops: Animation.Infinite
-        }
+            Anim on waveProgress {
+                running: !root.wavePaused && root.waveAmplitude > 0
+                paused: false
+                from: 0
+                to: 1
+                duration: root.waveDuration
+                easing.type: Easing.Linear
+                loops: Animation.Infinite
+            }
 
-        Behavior on color {
-            CAnim {}
-        }
-
-        Behavior on amplitudeMultiplier {
-            Anim {
-                type: Anim.DefaultEffects
+            Behavior on color {
+                CAnim {}
             }
         }
     }
