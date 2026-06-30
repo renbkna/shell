@@ -105,7 +105,8 @@ Item {
         elideWidth: root.maxHeight - icon.height
 
         Component.onCompleted: root.syncCurrentTitle(elidedText)
-        onElidedTextChanged: root.switchTitle(elidedText)
+        onTextChanged: root.switchTitle(elidedText)
+        onElideWidthChanged: root.syncCurrentTitle(elidedText)
     }
 
     Behavior on implicitHeight {
