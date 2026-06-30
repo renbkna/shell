@@ -39,31 +39,35 @@ Item {
     implicitWidth: implicitSize
     implicitHeight: implicitSize
 
-    Shape {
-        preferredRendererType: Shape.CurveRenderer
-        asynchronous: true
-        visible: !root.wavy
-        opacity: Math.min(1, progressArc.sweepAngle)
+    Loader {
+        active: !root.wavy
+        anchors.fill: parent
 
-        ShapePath {
-            fillColor: "transparent"
-            strokeColor: root.fgColour
-            strokeWidth: root.strokeWidth
-            capStyle: ShapePath.RoundCap
+        sourceComponent: Shape {
+            preferredRendererType: Shape.CurveRenderer
+            asynchronous: true
+            opacity: Math.min(1, progressArc.sweepAngle)
 
-            PathAngleArc {
-                id: progressArc
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.fgColour
+                strokeWidth: root.strokeWidth
+                capStyle: ShapePath.RoundCap
 
-                radiusX: root.arcRadius
-                radiusY: root.arcRadius
-                centerX: root.size / 2
-                centerY: root.size / 2
-                startAngle: root.startAngle
-                sweepAngle: Math.max(1 / 360, root.sweepAngle * root.clampedVal)
-            }
+                PathAngleArc {
+                    id: progressArc
 
-            Behavior on strokeColor {
-                CAnim {}
+                    radiusX: root.arcRadius
+                    radiusY: root.arcRadius
+                    centerX: root.size / 2
+                    centerY: root.size / 2
+                    startAngle: root.startAngle
+                    sweepAngle: Math.max(1 / 360, root.sweepAngle * root.clampedVal)
+                }
+
+                Behavior on strokeColor {
+                    CAnim {}
+                }
             }
         }
     }

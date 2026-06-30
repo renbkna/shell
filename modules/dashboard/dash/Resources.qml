@@ -62,6 +62,7 @@ Item {
         readonly property real targetValue: Math.max(0, Math.min(1, isNaN(rawValue) ? 0 : rawValue))
         property bool animateNextValueChange
         property real displayedValue: targetValue
+        property real previousTargetValue: targetValue
 
         Layout.fillHeight: true
         implicitSize: height
@@ -69,7 +70,8 @@ Item {
         value: displayedValue
 
         onTargetValueChanged: {
-            animateNextValueChange = Math.abs(targetValue - displayedValue) >= 0.05;
+            animateNextValueChange = Math.abs(targetValue - previousTargetValue) >= 0.05;
+            previousTargetValue = targetValue;
             displayedValue = targetValue;
         }
 
